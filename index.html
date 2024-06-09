@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lighthouse Analysis</title>
+</head>
+<body>
+    <h1>Lighthouse Analysis</h1>
+    <form id="analyzeForm">
+        <label for="urlInput">Enter URL:</label>
+        <input type="text" id="urlInput" name="urlInput">
+        <button type="button" id="analyzeButton">Analyze</button>
+        <button type="button" id="checkAnotherButton" style="display: none;">Check Another Website</button>
+    </form>
+    <div id="results"></div>
+
+    <script>
+        document.getElementById('analyzeButton').addEventListener('click', async () => {
+            const url = document.getElementById('urlInput').value.trim();
+            if (!url) {
+                alert('Please enter a valid URL.');
+                return;
+            }
+
+            // Disable the analyze button
+            document.getElementById('analyzeButton').disabled = true;
+
+            try {
+                // Fetch data from backend
+                const response = await fetch('http://localhost:4000/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url })
+                });
+                const data = await response.json();
+
+                // Display results on the webpage
+                displayResults(data);
+
+                // Show the "Check Another Website" button
+                document.getElementById('checkAnotherButton').style.display = 'block';
+            } catch (error) {
+                console.error('Error:', error);
+                // Display error message on the webpage
+                const resultsDiv = document.getElementById('results');
+                resultsDiv.innerHTML = `<p>Error: ${error.message}</p>`;
+            } finally {
+                // Enable the analyze button
+                document.getElementById('analyzeButton').disabled = false;
+            }
+        });
+
+        // Event listener for the "Check Another Website" button
+        document.getElementById('checkAnotherButton').addEventListener('click', () => {
+            // Clear input and results
+            document.getElementById('urlInput').value = '';
+            document.getElementById('results').innerHTML = '';
+            // Hide the button
+            document.getElementById('checkAnotherButton').style.display = 'none';
+        });
+
+        function displayResults(data) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `
+                <p>First Meaningful Paint: ${data.first_meaningful_paint}</p>
+                <h2>Blocking Resources:</h2>
+                <ul>
+                    ${data.blocking_resources.map(resource => `
+                        <li>
+                            <strong>URL:</strong> ${resource.url}<br>
+                            <strong>Total Bytes:</strong> ${resource.total_bytes}
+                        </li>
+                    `).join('')}
+                </ul>
+            `;
+        }
+    </script>
+</body>
+</html>
