@@ -3,6 +3,7 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import lighthouse from 'lighthouse';
 import puppeteer from 'puppeteer';
+import fs from 'fs/promises';
 
 const app = express();
 app.use(cors());
@@ -23,7 +24,11 @@ async function runLighthouse(url) {
 
     await browser.close();
 
-    return runnerResult.lhr;
+    // Save the full report
+    const reportJson = runnerResult.report;
+    await fs.writeFile('lighthouse-report.json', reportJson);
+
+    return JSON.parse(reportJson);
 }
 
 app.post('/analyze', async (req, res) => {
@@ -34,22 +39,24 @@ app.post('/analyze', async (req, res) => {
     }
 
     try {
-        const lighthouseResult = await runLighthouse(url);
-        const fmp = lighthouseResult.audits['first-meaningful-paint'].displayValue;
-        const blockingResources = lighthouseResult.audits['render-blocking-resources'].details.items;
+        const runnerResult = await runLighthouse(url);
 
-        const results = {
+        // Extract relevant data from Lighthouse result
+        const fmp = runnerResult.audits['first-meaningful-paint'].displayValue;
+        const blockingResources = runnerResult.audits['render-blocking-resources'].details.items;
+
+        // Construct recommendations based on the analysis
+        const recommendations = blockingResources.map(resource => ({
+            url: resource.url,
+            total_bytes: resource.totalBytes,
+        }));
+
+        res.json({
             first_meaningful_paint: fmp,
-            blocking_resources: blockingResources.map(resource => ({
-                url: resource.url,
-                total_bytes: resource.totalBytes
-            }))
-        };
-
-        res.json(results);
+            blocking_resources: recommendations,
+        });
     } catch (error) {
-        console.error('Error running Lighthouse:', error);
-        res.status(500).json({ error: 'Error running Lighthouse' });
+        res.status(500).json({ error: 'Error running Lighthouse', details: error.message });
     }
 });
 
